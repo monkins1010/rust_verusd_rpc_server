@@ -1,0 +1,5 @@
+rpc_url = "RPC_URL:PORT"
+rpc_user = "RPC_USER"
+rpc_password = "RPC_PASSWORD"
+
+server_port = SERVER_PORT

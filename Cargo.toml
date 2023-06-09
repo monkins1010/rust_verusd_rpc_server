@@ -1,0 +1,11 @@
+[package]
+name = "rust_verusd_rpc_server"
+version = "0.1.0"
+edition = "2018"
+
+[dependencies]
+hyper = { version = "0.14", features = ["full"] }
+tokio = { version = "1", features = ["full"] }
+serde_json = "1.0"
+jsonrpc = "0.12"
+config = "0.10.1"
