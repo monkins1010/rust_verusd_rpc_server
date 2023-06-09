@@ -11,6 +11,7 @@ fn check_params(params: &[Box<RawValue>], expected_types: &[&str]) -> bool {
             "obj" => if !matches!(value, Value::Object(_)) { return false; },
             "arr" => if !matches!(value, Value::Array(_)) { return false; },
             "int" => if !matches!(value, Value::Number(n) if n.is_i64()) { return false; },
+            "float" => if !matches!(value, Value::Number(n) if n.is_f64()) { return false; },
             "str" => if !matches!(value, Value::String(_)) { return false; },
             "bool" => if !matches!(value, Value::Bool(_)) { return false; },
             _ => return false,
@@ -32,7 +33,13 @@ pub fn is_method_allowed(method: &str, params: &[Box<RawValue>]) -> bool {
                 (Ok(Value::String(_)), Ok(Value::Array(_)), Ok(Value::String(_)), Ok(Value::Number(_))) => true,
                 _ => false,
             }
-        }
+        },
+        "recoveridentity" => params.get(1).and_then(|p| serde_json::from_str::<Value>(&p.to_string()).ok()).map_or(false, |v| v.as_bool().unwrap_or(false)) && check_params(params, &["obj", "bool", "bool", "float", "str"]),
+        "registeridentity" => params.get(1).and_then(|p| serde_json::from_str::<Value>(&p.to_string()).ok()).map_or(false, |v| v.as_bool().unwrap_or(false)) && check_params(params, &["obj", "bool", "float", "str"]),
+        "revokeidentity" => params.get(1).and_then(|p| serde_json::from_str::<Value>(&p.to_string()).ok()).map_or(false, |v| v.as_bool().unwrap_or(false)) && check_params(params, &["str", "bool", "bool", "float", "str"]),
+        "updateidentity" => params.get(1).and_then(|p| serde_json::from_str::<Value>(&p.to_string()).ok()).map_or(false, |v| v.as_bool().unwrap_or(false)) && check_params(params, &["obj", "bool", "bool", "float", "str"]),
+        "setidentitytimelock" => params.get(2).and_then(|p| serde_json::from_str::<Value>(&p.to_string()).ok()).map_or(false, |v| v.as_bool().unwrap_or(false)) && check_params(params, &["str", "obj", "bool", "float", "str"]),
+        "sendcurrency" => params.get(4).and_then(|p| serde_json::from_str::<Value>(&p.to_string()).ok()).map_or(false, |v| v.as_bool().unwrap_or(false)) && check_params(params, &["str", "arr", "int", "float", "bool"]),
         "coinsupply" => check_params(params, &[]),
         "convertpassphrase" => check_params(params, &["str"]),
         "createmultisig" => check_params(params, &["int", "arr"]),
