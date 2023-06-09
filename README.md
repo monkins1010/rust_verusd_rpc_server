@@ -16,7 +16,7 @@ To get started with this library, you'll need to have Rust installed on your mac
 1. Clone the repository to your local machine:
 
 ```bash
-git clone https://github.com/michaeltout/rust_verusd_rpc_server.git
+git clone https://github.com/VerusCoin/rust_verusd_rpc_server.git
 ```
 
 2. Navigate into the project directory:
