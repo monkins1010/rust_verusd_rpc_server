@@ -3,12 +3,12 @@ use serde_json::{Value, json};
 use jsonrpc::{Client, error::RpcError};
 use jsonrpc::simple_http::{self, SimpleHttpTransport};
 use serde_json::value::RawValue;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 
 mod allowlist;
 
 struct VerusRPC {
-    client: Arc<Client>,
+    client: Arc<Mutex<Client>>,
 }
 
 impl VerusRPC {
@@ -17,22 +17,31 @@ impl VerusRPC {
             .url(url)?
             .auth(user, Some(pass))
             .build();
-        Ok(VerusRPC { client: Arc::new(Client::with_transport(transport)) })
+        Ok(VerusRPC { client: Arc::new(Mutex::new(Client::with_transport(transport))) })
     }
 
     fn handle(&self, req_body: Value) -> Result<Value, RpcError> {
-        let method = req_body["method"].as_str().unwrap();
-        let params: Vec<Box<RawValue>> = req_body["params"].as_array().unwrap().iter().map(|v| RawValue::from_string(v.to_string()).unwrap()).collect();
+        let method = match req_body["method"].as_str() {
+            Some(method) => method,
+            None => return Err(RpcError { code: -32602, message: "Invalid method parameter".into(), data: None }),
+        };
+        let params: Vec<Box<RawValue>> = match req_body["params"].as_array() {
+            Some(params) => params.iter().map(|v| RawValue::from_string(v.to_string()).unwrap()).collect(),
+            None => return Err(RpcError { code: -32602, message: "Invalid params parameter".into(), data: None }),
+        };
     
         if !allowlist::is_method_allowed(method, &params) {
             return Err(RpcError { code: -32601, message: "Method not found".into(), data: None });
         }
     
-        let request = self.client.build_request(method, &params);
-        let response = self.client.send_request(request).map_err(|e| match e {
+        let client = self.client.lock().unwrap();
+        let request = client.build_request(method, &params);
+
+        let response = client.send_request(request).map_err(|e| match e {
             jsonrpc::Error::Rpc(rpc_error) => rpc_error,
             _ => RpcError { code: -32603, message: "Internal error".into(), data: None },
         })?;
+        
         let result: Value = response.result().map_err(|e| match e {
             jsonrpc::Error::Rpc(rpc_error) => rpc_error,
             _ => RpcError { code: -32603, message: "Internal error".into(), data: None },
@@ -42,10 +51,27 @@ impl VerusRPC {
 }
 
 async fn handle_req(req: Request<Body>, rpc: Arc<VerusRPC>) -> Result<Response<Body>, hyper::Error> {
+    // Maximum allowed content length (in bytes)
+    const MAX_CONTENT_LENGTH: u64 = 1024 * 1024 * 10; // 1 MiB, adjust as needed
+
+    if let Some(content_length) = req.headers().get(hyper::header::CONTENT_LENGTH) {
+        if let Ok(content_length) = content_length.to_str().unwrap_or("").parse::<u64>() {
+            if content_length > MAX_CONTENT_LENGTH {
+                return Ok(Response::builder()
+                    .status(hyper::StatusCode::PAYLOAD_TOO_LARGE)
+                    .body(Body::from("Payload too large"))
+                    .unwrap());
+            }
+        }
+    }
+    
     let whole_body = hyper::body::to_bytes(req.into_body()).await?;
     let str_body = String::from_utf8(whole_body.to_vec()).unwrap();
-    let json_body: Value = serde_json::from_str(&str_body).unwrap();
-    let result = rpc.handle(json_body);
+    let json_body: Result<Value, _> = serde_json::from_str(&str_body);
+    let result = match json_body {
+        Ok(req_body) => rpc.handle(req_body),
+        Err(_) => Err(RpcError { code: -32700, message: "Parse error".into(), data: None }),
+    };
     match result {
         Ok(res) => Ok(Response::new(Body::from(json!({"result": res}).to_string()))),
         Err(err) => Ok(Response::new(Body::from(json!({"error": { "code": err.code, "message": err.message }}).to_string()))),
