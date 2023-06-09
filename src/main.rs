@@ -26,7 +26,23 @@ impl VerusRPC {
             None => return Err(RpcError { code: -32602, message: "Invalid method parameter".into(), data: None }),
         };
         let params: Vec<Box<RawValue>> = match req_body["params"].as_array() {
-            Some(params) => params.iter().map(|v| RawValue::from_string(v.to_string()).unwrap()).collect(),
+            Some(params) => {
+                params.iter().enumerate().map(|(i, v)| {
+                    if method == "getblock" && i == 0 {
+                        if let Ok(num) = v.to_string().parse::<i64>() {
+                            // Legacy hack because getblock in JS used to allow 
+                            // strings to be passed in clientside and the former JS rpc server
+                            // wouldn't care. This will be deprecated in the future and shouldn't
+                            // be relied upon.
+                            RawValue::from_string(format!("\"{}\"", num)).unwrap()
+                        } else {
+                            RawValue::from_string(v.to_string()).unwrap()
+                        }
+                    } else {
+                        RawValue::from_string(v.to_string()).unwrap()
+                    }
+                }).collect()
+            },
             None => return Err(RpcError { code: -32602, message: "Invalid params parameter".into(), data: None }),
         };
     
