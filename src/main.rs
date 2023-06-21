@@ -104,9 +104,10 @@ async fn main() {
     let user = settings.get_str("rpc_user").expect("Failed to read 'rpc_user' from configuration");
     let password = settings.get_str("rpc_password").expect("Failed to read 'rpc_password' from configuration");
     
-    let port = settings.get_str("server_port").expect("Failed to read 'server_port' from configuration");
+    let port = settings.get::<u16>("server_port").expect("Failed to read 'server_port' from configuration");
+    let server_addr = settings.get_str("server_addr").expect("Failed to read 'server_addr' from configuration");
 
-    let addr = ([127, 0, 0, 1], port.parse().unwrap()).into();
+    let addr = (server_addr.parse::<std::net::IpAddr>().unwrap(), port).into();
 
     let make_svc = make_service_fn(|_conn| {
         let rpc = Arc::new(VerusRPC::new(&url, &user, &password).unwrap());
