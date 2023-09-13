@@ -89,8 +89,26 @@ async fn handle_req(req: Request<Body>, rpc: Arc<VerusRPC>) -> Result<Response<B
         Err(_) => Err(RpcError { code: -32700, message: "Parse error".into(), data: None }),
     };
     match result {
-        Ok(res) => Ok(Response::new(Body::from(json!({"result": res}).to_string()))),
-        Err(err) => Ok(Response::new(Body::from(json!({"error": { "code": err.code, "message": err.message }}).to_string()))),
+        Ok(res) => { 
+            let response = Response::builder()
+			.status(hyper::http::StatusCode::OK)
+			.header("Access-Control-Allow-Origin", "*")
+			.header("Access-Control-Allow-Headers", "*")
+			.header("Access-Control-Allow-Methods", "POST, GET, OPTIONS")
+			.body(Body::from(json!({"result": res}).to_string()))
+            .unwrap();
+            Ok(response) 
+        },
+        Err(err) => { 
+            let response = Response::builder()
+			.status(hyper::http::StatusCode::OK)
+			.header("Access-Control-Allow-Origin", "*")
+			.header("Access-Control-Allow-Headers", "*")
+			.header("Access-Control-Allow-Methods", "POST, GET, OPTIONS")
+			.body(Body::from(json!({"error": { "code": err.code, "message": err.message }}).to_string()))
+            .unwrap();
+            Ok(response) 
+        },
     }
 }
 
